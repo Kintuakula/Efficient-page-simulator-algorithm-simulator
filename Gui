@@ -1,0 +1,213 @@
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Map;
+
+public class VotingSystemGUI {
+    private final VotingSystemCore core = new VotingSystemCore();
+
+    private JFrame frame;
+    private JPanel candidatePanel;
+    private boolean darkMode = false;
+
+    // Colors & Fonts...
+    private static final Color LIGHT_BG = new Color(240, 248, 255);
+    private static final Color DARK_BG = new Color(34, 34, 34);
+    private static final Color LIGHT_TEXT = new Color(50, 50, 50);
+    private static final Color DARK_TEXT = new Color(255, 255, 255);
+    private static final Color PRIMARY_COLOR = new Color(70, 130, 180);
+    private static final Color SECONDARY_COLOR = new Color(255, 140, 0);
+    private static final Color CARD_COLOR_LIGHT = Color.WHITE;
+    private static final Color CARD_COLOR_DARK = new Color(50, 50, 50);
+
+    private static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 32);
+    private static final Font HEADER_FONT = new Font("Segoe UI", Font.BOLD, 20);
+    private static final Font BUTTON_FONT = new Font("Segoe UI", Font.BOLD, 16);
+    private static final Font BODY_FONT = new Font("Segoe UI", Font.PLAIN, 14);
+    private static final Font WINNER_FONT = new Font("Segoe UI", Font.BOLD, 36);
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new VotingSystemGUI().buildGUI());
+    }
+
+    public void buildGUI() {
+        frame = new JFrame("🗳️ Voting System");
+        frame.setSize(850, 750);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLayout(new BorderLayout(10, 10));
+
+        frame.add(createHeaderPanel(), BorderLayout.NORTH);
+
+        candidatePanel = new JPanel(new GridLayout(0, 3, 15, 15));
+        JScrollPane scrollPane = new JScrollPane(candidatePanel);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        frame.add(scrollPane, BorderLayout.CENTER);
+
+        frame.add(createControlPanel(), BorderLayout.SOUTH);
+
+        applyTheme();
+        frame.setVisible(true);
+    }
+
+    private JPanel createHeaderPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JLabel titleLabel = new JLabel("Voting System", SwingConstants.CENTER);
+        titleLabel.setFont(TITLE_FONT);
+        panel.add(titleLabel, BorderLayout.CENTER);
+
+        JButton toggleTheme = new JButton("Toggle Mode");
+        toggleTheme.addActionListener(e -> {
+            darkMode = !darkMode;
+            applyTheme();
+        });
+        styleSecondaryButton(toggleTheme);
+        panel.add(toggleTheme, BorderLayout.EAST);
+
+        return panel;
+    }
+
+    private JPanel createControlPanel() {
+        JPanel panel = new JPanel(new FlowLayout());
+
+        JTextField candidateField = new JTextField(20);
+        styleTextField(candidateField);
+
+        JButton addBtn = new JButton("Add Candidate");
+        stylePrimaryButton(addBtn);
+        addBtn.addActionListener(e -> {
+            String name = candidateField.getText().trim();
+            if (!name.isEmpty() && core.addCandidate(name)) {
+                addCandidateCard(name);
+                candidateField.setText("");
+            }
+        });
+
+        JButton resultsBtn = new JButton("Show Results");
+        styleSecondaryButton(resultsBtn);
+        resultsBtn.addActionListener(e -> showResultsWindow());
+
+        JButton resetBtn = new JButton("Reset Votes");
+        styleSecondaryButton(resetBtn);
+        resetBtn.addActionListener(e -> {
+            core.resetVotes();
+            candidatePanel.removeAll();
+            for (String name : core.getCandidates()) {
+                addCandidateCard(name);
+            }
+        });
+
+        JButton exportBtn = new JButton("Export Results");
+        styleSecondaryButton(exportBtn);
+        exportBtn.addActionListener(e -> {
+            try {
+                core.exportResults("voting_results.txt");
+                JOptionPane.showMessageDialog(frame, "Results exported successfully!");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(frame, "Error exporting results.");
+            }
+        });
+
+        panel.add(new JLabel("Candidate Name:"));
+        panel.add(candidateField);
+        panel.add(addBtn);
+        panel.add(resultsBtn);
+        panel.add(resetBtn);
+        panel.add(exportBtn);
+
+        return panel;
+    }
+
+    private void addCandidateCard(String name) {
+        JPanel card = new JPanel(new BorderLayout());
+        card.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(PRIMARY_COLOR, 1),
+                new EmptyBorder(15, 15, 15, 15)));
+
+        JLabel nameLabel = new JLabel(name, SwingConstants.CENTER);
+        nameLabel.setFont(HEADER_FONT);
+
+        JButton voteBtn = new JButton("Vote");
+        stylePrimaryButton(voteBtn);
+        voteBtn.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(frame,
+                    "Vote for " + name + "?", "Confirm", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                core.vote(name);
+                JOptionPane.showMessageDialog(frame, "Your vote for " + name + " has been recorded!");
+            }
+        });
+
+        card.add(nameLabel, BorderLayout.NORTH);
+        card.add(voteBtn, BorderLayout.CENTER);
+
+        candidatePanel.add(card);
+        applyTheme();
+        candidatePanel.revalidate();
+    }
+
+    private void showResultsWindow() {
+        var sortedList = core.getSortedResults();
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(darkMode ? DARK_BG : LIGHT_BG);
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel winnerLabel;
+        String winner = core.getWinnerName();
+        if (winner != null) {
+            winnerLabel = new JLabel("🏆 WINNER: " + winner.toUpperCase(), SwingConstants.CENTER);
+        } else {
+            winnerLabel = new JLabel("NO VOTES CAST YET!", SwingConstants.CENTER);
+        }
+        winnerLabel.setFont(WINNER_FONT);
+        winnerLabel.setForeground(darkMode ? DARK_TEXT : LIGHT_TEXT);
+        panel.add(winnerLabel, BorderLayout.NORTH);
+
+        JTextArea resultArea = new JTextArea(core.getResultText());
+        resultArea.setFont(BODY_FONT);
+        resultArea.setEditable(false);
+        resultArea.setBackground(darkMode ? DARK_BG : LIGHT_BG);
+        resultArea.setForeground(darkMode ? DARK_TEXT : LIGHT_TEXT);
+        panel.add(new JScrollPane(resultArea), BorderLayout.CENTER);
+
+        JOptionPane.showMessageDialog(frame, panel, "Voting Results", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void stylePrimaryButton(JButton btn) {
+        btn.setFont(BUTTON_FONT);
+        btn.setBackground(PRIMARY_COLOR);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+    }
+
+    private void styleSecondaryButton(JButton btn) {
+        btn.setFont(BUTTON_FONT);
+        btn.setBackground(SECONDARY_COLOR);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+    }
+
+    private void styleTextField(JTextField tf) {
+        tf.setFont(BODY_FONT);
+    }
+
+    private void applyTheme() {
+        Color bg = darkMode ? DARK_BG : LIGHT_BG;
+        Color fg = darkMode ? DARK_TEXT : LIGHT_TEXT;
+        Color card = darkMode ? CARD_COLOR_DARK : CARD_COLOR_LIGHT;
+
+        frame.getContentPane().setBackground(bg);
+        candidatePanel.setBackground(bg);
+        for (Component comp : candidatePanel.getComponents()) {
+            if (comp instanceof JPanel panel) {
+                panel.setBackground(card);
+                for (Component child : panel.getComponents()) {
+                    child.setForeground(fg);
+                }
+            }
+        }
+        frame.repaint();
+    }
+}
