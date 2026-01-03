@@ -1,0 +1,60 @@
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.*;
+
+public class VotingSystemCore {
+    private final HashMap<String, Integer> voteMap = new HashMap<>();
+
+    public boolean addCandidate(String name) {
+        if (!voteMap.containsKey(name)) {
+            voteMap.put(name, 0);
+            return true;
+        }
+        return false;
+    }
+
+    public void resetVotes() {
+        voteMap.replaceAll((k, v) -> 0);
+    }
+
+    public void vote(String name) {
+        voteMap.put(name, voteMap.getOrDefault(name, 0) + 1);
+    }
+
+    public int getVotes(String name) {
+        return voteMap.getOrDefault(name, 0);
+    }
+
+    public Set<String> getCandidates() {
+        return voteMap.keySet();
+    }
+
+    public List<Map.Entry<String, Integer>> getSortedResults() {
+        List<Map.Entry<String, Integer>> sortedList = new ArrayList<>(voteMap.entrySet());
+        sortedList.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+        return sortedList;
+    }
+
+    public void exportResults(String filename) throws IOException {
+        try (FileWriter writer = new FileWriter(filename)) {
+            for (Map.Entry<String, Integer> entry : voteMap.entrySet()) {
+                writer.write(entry.getKey() + ": " + entry.getValue() + " votes\n");
+            }
+        }
+    }
+
+    public String getResultText() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\nResults:\n");
+        for (Map.Entry<String, Integer> entry : getSortedResults()) {
+            sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(" votes\n");
+        }
+        return sb.toString();
+    }
+
+    public String getWinnerName() {
+        List<Map.Entry<String, Integer>> sorted = getSortedResults();
+        return sorted.isEmpty() ? null : sorted.get(0).getKey();
+    }
+}
