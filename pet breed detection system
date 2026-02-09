@@ -1,0 +1,131 @@
+from flask import Flask, request, render_template_string
+from PIL import Image
+import sqlite3
+import os
+
+app = Flask(__name__)
+
+# ---------------- FOLDERS ----------------
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# ---------------- DATABASE ----------------
+DB_NAME = "pets.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS pets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            breed TEXT,
+            price INTEGER,
+            image TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# ---------------- AI BREED DETECTION (SIMULATED) ----------------
+def detect_breed(filename):
+    name = filename.lower()
+
+    if "husky" in name:
+        return "Siberian Husky", 85000
+
+    elif "german" in name:
+        return "German Shepherd", 60000
+
+    elif "golden" in name:
+        return "Golden Retriever", 50000
+
+    elif "labrador" in name:
+        return "Labrador Retriever", 45000
+
+    elif "pug" in name:
+        return "Pug", 70000
+
+    elif "cat" in name:
+        return "Persian Cat", 25000
+
+    elif "parrot" in name:
+        return "Macaw Parrot", 120000
+
+    else:
+        return "Unknown Breed", 150000
+
+# ---------------- HOME ----------------
+@app.route("/", methods=["GET", "POST"])
+def home():
+    breed = price = img = None
+
+    if request.method == "POST":
+        file = request.files["image"]
+        if file:
+            img = file.filename
+            path = os.path.join(UPLOAD_FOLDER, img)
+            file.save(path)
+
+            breed, price = detect_breed(img)
+
+            # Save to database
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO pets (breed, price, image) VALUES (?, ?, ?)",
+                (breed, price, img)
+            )
+            conn.commit()
+            conn.close()
+
+    # Fetch stored pets
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT breed, price, image FROM pets ORDER BY id DESC")
+    pets = cur.fetchall()
+    conn.close()
+
+    return render_template_string("""
+        <h1>🐾 Pet Breed Detection System</h1>
+
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="image" required>
+            <button>Detect Breed</button>
+        </form>
+
+        {% if breed %}
+            <hr>
+            <h2>Detected Breed: {{breed}}</h2>
+            <h3>Price: ₹{{price}}</h3>
+            <img src="/uploads/{{img}}" width="300">
+        {% endif %}
+
+        <hr>
+        <h2>📂 Stored Pets (Database)</h2>
+
+        <table border="1" cellpadding="8">
+            <tr>
+                <th>Breed</th>
+                <th>Price</th>
+                <th>Image</th>
+            </tr>
+            {% for p in pets %}
+            <tr>
+                <td>{{p[0]}}</td>
+                <td>₹{{p[1]}}</td>
+                <td><img src="/uploads/{{p[2]}}" width="120"></td>
+            </tr>
+            {% endfor %}
+        </table>
+    """, breed=breed, price=price, img=img, pets=pets)
+
+# ---------------- IMAGE ACCESS ----------------
+@app.route("/uploads/<filename>")
+def uploaded(filename):
+    return open(os.path.join(UPLOAD_FOLDER, filename), "rb").read()
+
+# ---------------- RUN ----------------
+if __name__ == "__main__":
+    app.run(debug=True)
